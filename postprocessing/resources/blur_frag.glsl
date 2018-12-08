@@ -10,6 +10,11 @@ layout(location = 0) out vec4 colortex;
 
 in vec2 fragTex;
 
+layout(std140) uniform weights_ssbo
+{ 
+  float weights[1000];
+};
+
 void main()
 {
 	vec3 texturecolor = texture(tex, fragTex, 0).rgb;
@@ -46,25 +51,26 @@ void main()
 	//float weights[5] = {0.198005, 0.200995, 0.202001, 0.200995, 0.198005};
 	
 	float weights[9] = {0.000229, 0.005977, 0.060598, 0.241732, 0.382928, 0.241732, 0.060598, 0.005977, 0.000229};
-
-	//float weights[9] = {4.46102e-05, 0.00147729, 0.018085, 0.116141, 0.728505, 0.116141, 0.018085, 0.00147729, 4.46102e-05};
+	int size = 9;
 
     if (horizontal == 1) {
-        for (int i = 0; i < 9; ++i) {
+        for (int i = 0; i < size; ++i) {
             texturecolor.rgb += texture(tex, fragTex + vec2(float(i) * offset.x, 0.0), 0).rgb * weights[i];
             texturecolor.rgb += texture(tex, fragTex - vec2(float(i) * offset.x, 0.0), 0).rgb * weights[i];
+			//texturecolor.rgb /= 2.0f;
         }
     } else {
-        for (int i = 0; i < 9; ++i) {
+        for (int i = 0; i < size; ++i) {
             texturecolor.rgb += texture(tex, fragTex + vec2(0.0, float(i) * offset.y), 0).rgb * weights[i];
             texturecolor.rgb += texture(tex, fragTex - vec2(0.0, float(i) * offset.y), 0).rgb * weights[i];
+			//texturecolor.rgb /= 2.0f;
         }
     }
 
-	
+	//texturecolor = normalize(texturecolor);
+	//texturecolor = texturecolor/2.0;
 	colortex = vec4(texturecolor, 1.0);
 	colortex.a = 1.0;
 
 
-	//colortex.rgb = texturecolor;
 }

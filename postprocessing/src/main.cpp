@@ -1,4 +1,4 @@
-/* Lab 6 base code - transforms using local matrix functions
+﻿/* Lab 6 base code - transforms using local matrix functions
 	to be written by students -
 	based on lab 5 by CPE 471 Cal Poly Z. Wood + S. Sueda
 	& Ian Dunn, Christian Eckhardt
@@ -36,11 +36,11 @@ public:
 	//double weights[9][1];
 	//double weights[11];
 
-	double * Calculate1DSampleKernel(double deviation, int size)
+	float * Calculate1DSampleKernel(double deviation, int size)
 	{
 		//double * weights = NULL;
-		double * weights = new double[size];
-		double sum = 0;
+		float * weights = new float[size];
+		float sum = 0;
 
 		int half = size / 2;
 		for (int i = 0; i < size; i++)
@@ -66,7 +66,7 @@ public:
 	//	int size = (int)Math.Ceiling(deviation * 3) * 2 + 1;
 	//	return Calculate1DSampleKernel(deviation, size);
 	//}
-	double * CalculateNormalized1DSampleKernel(double deviation, int size)
+	float * CalculateNormalized1DSampleKernel(double deviation, int size)
 	{
 		// clear weights
 		//double * weights = new double[size];
@@ -74,12 +74,12 @@ public:
 		//	weights[i] = 0;
 		//}
 
-		double * weights = Calculate1DSampleKernel(deviation, size);
+		float * weights = Calculate1DSampleKernel(deviation, size);
 		NormalizeMatrix(weights, size);
 		return weights;
 	}
 
-	void NormalizeMatrix(double* weights, int size)
+	void NormalizeMatrix(float* weights, int size)
 	{
 		//double[, ] ret = new double[matrix.GetLength(0), matrix.GetLength(1)];
 		double sum = 0;
@@ -120,8 +120,8 @@ public:
 	camera mycam;
 
 	//texture for sim
-	GLuint TextureEarth;
-	GLuint TextureMoon,TexColor, TexAlpha, BlurredTexAlpha[2] , fb, BlurFBO[2], depth_rb, depth_rb2;
+	GLuint TextureEarth, TextureMoon, TextureJupiter, TextureMercury, TextureVenus, TextureMars;
+	GLuint TexColor, TexAlpha, BlurredTexAlpha[2] , fb, BlurFBO[2], depth_rb, depth_rb2;
 
 	GLuint VertexArrayIDBox, VertexBufferIDBox, VertexBufferTex;
 	
@@ -130,6 +130,15 @@ public:
 
 	// Data necessary to give our triangle to OpenGL
 	GLuint VertexBufferID;
+
+	// gaussian weights ssbo
+	GLuint weights_ssbo;
+	float * weights = NULL;
+	int size = 9;
+
+	// controls
+	int activateBlur = 0;
+	float glowScale = 0.5f;
 
 	void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 	{
@@ -169,6 +178,9 @@ public:
 		{
 			mycam.d = 0;
 		}
+		if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE){ activateBlur = !activateBlur;}
+		if (key == GLFW_KEY_UP && action == GLFW_PRESS) { glowScale += 0.05; };
+		if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) { glowScale -= 0.05; };
 	}
 
 	void mouseCallback(GLFWwindow *window, int button, int action, int mods)
@@ -224,6 +236,7 @@ public:
 		prog->addUniform("P");
 		prog->addUniform("V");
 		prog->addUniform("M");
+		prog->addUniform("glowScale");
 		prog->addUniform("campos");
 		prog->addAttribute("vertPos");
 		prog->addAttribute("vertNor");
@@ -242,6 +255,7 @@ public:
 		prog_blur->addUniform("P");
 		prog_blur->addUniform("V");
 		prog_blur->addUniform("M");
+		prog_blur->addUniform("weights_ssbo");
 		prog_blur->addUniform("horizontal");
 		prog_blur->addAttribute("vertPos");
 		prog_blur->addAttribute("vertTex");
@@ -259,6 +273,7 @@ public:
 		prog_final->addUniform("P");
 		prog_final->addUniform("V");
 		prog_final->addUniform("M");
+		prog_final->addUniform("activateBlur");
 		prog_final->addAttribute("vertPos");
 		prog_final->addAttribute("vertTex");
 	}
@@ -339,7 +354,7 @@ public:
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
 		
-		width = 640; height = 480;
+		//width = 640; height = 480;
 
 		//texture moon
 		str = resourceDirectory + "/moon.jpg";
@@ -348,6 +363,62 @@ public:
 		glGenTextures(1, &TextureMoon);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, TextureMoon);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		//texture mercury
+		str = resourceDirectory + "/mercury.jpg";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &TextureMercury);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureMercury);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		//texture venus
+		str = resourceDirectory + "/venus.jpg";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &TextureVenus);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureVenus);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		
+		//texture mars
+		str = resourceDirectory + "/mars.jpg";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &TextureMars);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureMars);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		//texture jupiter
+		str = resourceDirectory + "/jupiter.jpg";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &TextureJupiter);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureJupiter);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -458,10 +529,9 @@ public:
 		// 
 			// testing gaus calculation
 		Gaussian *gauss = new Gaussian();
-		int size = 11;
-		double* weights_low = gauss->CalculateNormalized1DSampleKernel(1.0, size);
-		double* weights_mid = gauss->CalculateNormalized1DSampleKernel(0.5, size);
-		double* weights_hi = gauss->CalculateNormalized1DSampleKernel(0.1, size);
+		float* weights_low = gauss->CalculateNormalized1DSampleKernel(1.0, size);
+		float* weights_mid = gauss->CalculateNormalized1DSampleKernel(0.5, size);
+		float* weights_hi = gauss->CalculateNormalized1DSampleKernel(0.1, size);
 
 		for (int i = 0; i < size; i++) {
 			cout << weights_low[i] << " ";
@@ -470,15 +540,19 @@ public:
 			cout << endl;
 		} cout << endl;
 
-		double * avg = new double[size];
+		weights = new float[size];
 		for (int i = 0; i < size; i++) {
-			avg[i] = (weights_low[i] + weights_mid[i] + weights_hi[i]) / 3.0;
-			cout << avg[i] << " ";
-		}cout << endl;
+			weights[i] = (weights_low[i] + weights_mid[i] + weights_hi[i]) / 3.0;
+			cout << weights[i] << " ";
+		} cout << endl;
 
-		GLuint weights_ssbo;
 		glGenBuffers(1, &weights_ssbo);
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, weights_ssbo);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * size, &weights, GL_DYNAMIC_COPY);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, weights_ssbo);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+
+		//GLuint weights_ssbo_id =  glGetUniformBlockIndex(prog_blur, &weights_ssbo);
 
 
 		//-------------------------
@@ -536,34 +610,75 @@ public:
 		glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P[0][0]);
 		glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniform3fv(prog->getUniform("campos"), 1, &mycam.pos.x);
+		glUniform1f(prog->getUniform("glowScale"), glowScale);
+
+		float pih = -3.1415926 / 2.0;
+		glm::mat4 Rx = glm::rotate(glm::mat4(1.f), pih, glm::vec3(1, 0, 0));
+		//	******		planet		******
+		static float mer_angle = 0;
+		mer_angle += 0.005;
+		M = glm::translate(glm::mat4(1.f), glm::vec3(-6.5, 0, 0));
+		glm::mat4 Ry = glm::rotate(glm::mat4(1.f), mer_angle, glm::vec3(0, 1, 0));
+		S = glm::scale(glm::mat4(1.f), glm::vec3(0.5));
+		M = M * Ry * Rx * S;
+		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureMercury);
+
+		shape->draw(prog);
+
+		shape->draw(prog);	//draw moon
+
+//	******		planet		******
+		static float ven_angle = 0;
+		ven_angle += 0.005;
+		M = glm::translate(glm::mat4(1.f), glm::vec3(-3.0, 0, -2.5));
+		Ry = glm::rotate(glm::mat4(1.f), ven_angle, glm::vec3(0, 1, 0));
+		S = glm::scale(glm::mat4(1.f), glm::vec3(1.0));
+		M = M * Ry * Rx * S;
+		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureVenus);
+
+		shape->draw(prog);
 
 		//	******		earth		******
 		static float angle = 0;
-		//angle += 0.02;
+		angle += 0.02;
 		M = glm::translate(glm::mat4(1.f), glm::vec3(0, 0, -5));
-		glm::mat4 Ry = glm::rotate(glm::mat4(1.f), angle, glm::vec3(0, 1, 0));
-		float pih = -3.1415926 / 2.0;
-		glm::mat4 Rx = glm::rotate(glm::mat4(1.f), pih, glm::vec3(1, 0, 0));
+		Ry = glm::rotate(glm::mat4(1.f), angle, glm::vec3(0, 1, 0));
 		M = M * Ry * Rx;
 		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, TextureEarth);
-	
+
 		shape->draw(prog);	//draw earth
 
 		//	******		moon		******
 		static float moonangle = 0;
-		//moonangle += 0.005;
+		moonangle += 0.005;
 		M = glm::translate(glm::mat4(1.f), glm::vec3(-1.5, 0, 1.5));
 		glm::mat4 Ryrad = glm::rotate(glm::mat4(1.f), moonangle, glm::vec3(0, 1, 0));
 		T = glm::translate(glm::mat4(1.f), glm::vec3(0, 0, -5));
-		S = glm::scale(glm::mat4(1.f), glm::vec3(0.25, 0.25, 0.25));
+		S = glm::scale(glm::mat4(1.f), glm::vec3(0.25));
 		M = T * Ryrad * M * Rx * S;
 		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, TextureMoon);
-		
-		shape->draw(prog);	//draw moon
+
+
+		//	******		planet		******
+//tatic float mer_angle = 0;
+//mer_angle += 0.005;
+		M = glm::translate(glm::mat4(1.f), glm::vec3(3.0, 0, -3.5));
+		Ry = glm::rotate(glm::mat4(1.f), mer_angle, glm::vec3(0, 1, 0));
+		S = glm::scale(glm::mat4(1.f), glm::vec3(0.8));
+		M = M * Ry * Rx * S;
+		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, TextureMars);
+
+		shape->draw(prog);
 
 		//done, unbind stuff
 		prog->unbind();
@@ -571,9 +686,6 @@ public:
 
 	void render_blur_1() // aka render to framebuffer
 	{
-		//glBindFramebuffer(GL_FRAMEBUFFER, BlurFBO[0]);
-		//GLenum buffers[] = { GL_COLOR_ATTACHMENT0 };	// color and alpha
-		//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// Get current frame buffer size.
 		int width, height;
@@ -591,10 +703,38 @@ public:
 
 		// Bind to shader
 		prog_blur->bind();
+
+
+		GLuint block_index = 0;
+		//block_index = glGetProgramResourceIndex(prog_blur->pid, GL_SHADER_STORAGE_BLOCK, "weights_ssbo");
+		//cout << block_index << " - blockindex" << endl;
+		//GLuint ssbo_binding_point_index = 0;
+		//glShaderStorageBlockBinding(prog_blur->pid, block_index, ssbo_binding_point_index);
+		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, weights_ssbo);
+		//glUseProgram(prog_blur->pid);
+
+		// none of these are working
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, weights_ssbo);
+		GLvoid* p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+		memcpy(p, &weights, sizeof(float) * size);
+		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+		//glUseProgram(prog_blur->pid);
+		//GLuint ssbo_binding_point_index = 0;
+		//glShaderStorageBlockBinding(prog_blur->pid, block_index, ssbo_binding_point_index);
+		//block_index = 0;	//?
+		//block_index = glGetProgramResourceIndex(prog_blur->pid, GL_SHADER_STORAGE_BLOCK, "weights_data");	// The name corresponds to that in the shader
+		//ssbo_binding_point_index = 0;	// ?
+		//glShaderStorageBlockBinding(prog_blur->pid, block_index, ssbo_binding_point_index);
+		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, weights_ssbo);
+
+		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
+
 		glUniformMatrix4fv(prog_blur->getUniform("P"), 1, GL_FALSE, glm::value_ptr(P->topMatrix()));
 		glUniformMatrix4fv(prog_blur->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(prog_blur->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 		glBindVertexArray(VertexArrayIDBox);
+
 
 		int horizontal = 0;
 		int amount = 12;		// test incr amount here
@@ -647,6 +787,7 @@ public:
 
 		prog_final->bind();
 
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, BlurredTexAlpha[0]);
 		//glBindTexture(GL_TEXTURE_2D, TexColor);
@@ -656,6 +797,7 @@ public:
 		glUniformMatrix4fv(prog_final->getUniform("P"), 1, GL_FALSE, glm::value_ptr(P->topMatrix()));
 		glUniformMatrix4fv(prog_final->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(prog_final->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform1i(prog_final->getUniform("activateBlur"), activateBlur);
 		glBindVertexArray(VertexArrayIDBox);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
