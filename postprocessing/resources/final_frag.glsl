@@ -8,39 +8,29 @@ out vec4 colortex;
 in vec2 fragTex;
 
 uniform int activateBlur;
+uniform int glowMaskOnly;
 
 void main()
 {
+	vec3 glowColor = texture(tex, fragTex, 0).rgb;		// glow
+	vec3 texColor = texture(tex2, fragTex, 0).rgb;		// color
 	const float gamma = 2.2;
-	vec3 glowColor = texture(tex, fragTex, 0).rgb;		// alpha
-	vec3 texColor = texture(tex2, fragTex, 0).rgb;
-	texColor = pow(texColor, vec3(gamma));
+	texColor = pow(texColor, vec3(gamma));				// color correcting
 
-	//glowColor += texColor;
-	//glowColor/2.0;
-	//colortex.rgb = glowColor;
-
-	if (activateBlur == 1) {
-		vec3 combinedColor = vec3(1.0);
-
-		// *********** linear blending ****************
-		float t = 0.00005;
-		combinedColor = (glowColor * t) + (texColor * (1.0-t));
-
-
-		// ********** another blending ***************
+	if (glowMaskOnly == 0) {
+		
 		glowColor.rgb *= 0.00005;
-		combinedColor = texColor + glowColor; // additive blending
+		vec3 blendedColor = texColor + glowColor; // additive blending
 		float exposure = 1.0f;
 
-		// tone mapping
-		//combinedColor = vec3(1.0) - exp(-combinedColor * exposure);
+		colortex = vec4(blendedColor, 1.0);
 
-		colortex = vec4(combinedColor, 1.0);
-	} else {
-		
-		colortex.rgb = texColor;
+	} else {		
+		colortex.rgb = glowColor * 0.00005;
 	}
 
 	colortex.a = 1.0;
+
+
+
 }

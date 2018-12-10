@@ -138,6 +138,7 @@ public:
 
 	// controls
 	int activateBlur = 0;
+	int glowMaskOnly = 0;
 	float glowScale = 0.5f;
 
 	void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
@@ -179,8 +180,39 @@ public:
 			mycam.d = 0;
 		}
 		if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE){ activateBlur = !activateBlur;}
+		if (key == GLFW_KEY_TAB && action == GLFW_RELEASE){ glowMaskOnly = !glowMaskOnly;}
 		if (key == GLFW_KEY_UP && action == GLFW_PRESS) { glowScale += 0.05; };
 		if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) { glowScale -= 0.05; };
+		if (key == GLFW_KEY_5 && action == GLFW_PRESS) { 
+			size = 5; 
+			Gaussian *gauss = new Gaussian();
+			float * weights_t = gauss->CalculateNormalized1DSampleKernel(1.0, size);
+			weights = new float[size];
+			for (int i = 0; i < size; i++) {
+				weights[i] = weights_t[i];
+				cout << weights[i] << " ";
+			} cout << endl;
+		};
+		if (key == GLFW_KEY_7 && action == GLFW_PRESS) { 
+			size = 7; 
+			Gaussian *gauss = new Gaussian();
+			float * weights_t = gauss->CalculateNormalized1DSampleKernel(1.0, size);
+			weights = new float[size];
+			for (int i = 0; i < size; i++) {
+				weights[i] = weights_t[i];
+				cout << weights[i] << " ";
+			} cout << endl;
+		};
+		if (key == GLFW_KEY_9 && action == GLFW_PRESS) { 
+			size = 9; 
+			Gaussian *gauss = new Gaussian();
+			float * weights_t = gauss->CalculateNormalized1DSampleKernel(1.0, size);
+			weights = new float[size];
+			for (int i = 0; i < size; i++) {
+				weights[i] = weights_t[i];
+				cout << weights[i] << " ";
+			} cout << endl;
+		};
 	}
 
 	void mouseCallback(GLFWwindow *window, int button, int action, int mods)
@@ -238,6 +270,8 @@ public:
 		prog->addUniform("M");
 		prog->addUniform("glowScale");
 		prog->addUniform("campos");
+		prog->addUniform("minthresh");
+		prog->addUniform("maxthresh");
 		prog->addAttribute("vertPos");
 		prog->addAttribute("vertNor");
 		prog->addAttribute("vertTex");
@@ -256,7 +290,10 @@ public:
 		prog_blur->addUniform("V");
 		prog_blur->addUniform("M");
 		prog_blur->addUniform("weights_ssbo");
+		prog_blur->addUniform("size");
 		prog_blur->addUniform("horizontal");
+		prog_blur->addUniform("glowMaskOnly");
+		prog_blur->addUniform("activateBlur");
 		prog_blur->addAttribute("vertPos");
 		prog_blur->addAttribute("vertTex");
 
@@ -274,6 +311,7 @@ public:
 		prog_final->addUniform("V");
 		prog_final->addUniform("M");
 		prog_final->addUniform("activateBlur");
+		prog_final->addUniform("glowMaskOnly");
 		prog_final->addAttribute("vertPos");
 		prog_final->addAttribute("vertTex");
 	}
@@ -543,6 +581,7 @@ public:
 		weights = new float[size];
 		for (int i = 0; i < size; i++) {
 			weights[i] = (weights_low[i] + weights_mid[i] + weights_hi[i]) / 3.0;
+			//weights[i] = weights_low[i];
 			cout << weights[i] << " ";
 		} cout << endl;
 
@@ -607,38 +646,34 @@ public:
 
 		//bind shader and copy matrices
 		prog->bind();
+		vec3 minthresh = vec3(0.2);
+		vec3 maxthresh = vec3(0.7);
+
 		glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P[0][0]);
 		glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniform3fv(prog->getUniform("campos"), 1, &mycam.pos.x);
 		glUniform1f(prog->getUniform("glowScale"), glowScale);
+		glUniform3fv(prog->getUniform("minthresh"), 1, &minthresh.x);
+		glUniform3fv(prog->getUniform("maxthresh"), 1, &maxthresh.x);
+
 
 		float pih = -3.1415926 / 2.0;
 		glm::mat4 Rx = glm::rotate(glm::mat4(1.f), pih, glm::vec3(1, 0, 0));
-		//	******		planet		******
-		static float mer_angle = 0;
-		mer_angle += 0.005;
-		M = glm::translate(glm::mat4(1.f), glm::vec3(-6.5, 0, 0));
-		glm::mat4 Ry = glm::rotate(glm::mat4(1.f), mer_angle, glm::vec3(0, 1, 0));
-		S = glm::scale(glm::mat4(1.f), glm::vec3(0.5));
-		M = M * Ry * Rx * S;
-		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, TextureMercury);
-
-		shape->draw(prog);
-
-		shape->draw(prog);	//draw moon
 
 //	******		planet		******
 		static float ven_angle = 0;
 		ven_angle += 0.005;
 		M = glm::translate(glm::mat4(1.f), glm::vec3(-3.0, 0, -2.5));
-		Ry = glm::rotate(glm::mat4(1.f), ven_angle, glm::vec3(0, 1, 0));
+		mat4 Ry = glm::rotate(glm::mat4(1.f), ven_angle, glm::vec3(0, 1, 0));
 		S = glm::scale(glm::mat4(1.f), glm::vec3(1.0));
 		M = M * Ry * Rx * S;
 		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, TextureVenus);
+		minthresh = vec3(0.5, 0.3, 0.0);
+		glUniform3fv(prog->getUniform("minthresh"), 1, &minthresh.x);
+		maxthresh = vec3(1.0, 1.0, 0.2);
+		glUniform3fv(prog->getUniform("maxthresh"), 1, &maxthresh.x);
 
 		shape->draw(prog);
 
@@ -651,6 +686,10 @@ public:
 		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, TextureEarth);
+		minthresh = vec3(0.0, 0.0, 0.0);
+		glUniform3fv(prog->getUniform("minthresh"), 1, &minthresh.x);
+		maxthresh = vec3(1.0, 1.0, 0.2);
+		glUniform3fv(prog->getUniform("maxthresh"), 1, &maxthresh.x);
 
 		shape->draw(prog);	//draw earth
 
@@ -666,19 +705,6 @@ public:
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, TextureMoon);
 
-
-		//	******		planet		******
-//tatic float mer_angle = 0;
-//mer_angle += 0.005;
-		M = glm::translate(glm::mat4(1.f), glm::vec3(3.0, 0, -3.5));
-		Ry = glm::rotate(glm::mat4(1.f), mer_angle, glm::vec3(0, 1, 0));
-		S = glm::scale(glm::mat4(1.f), glm::vec3(0.8));
-		M = M * Ry * Rx * S;
-		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, TextureMars);
-
-		shape->draw(prog);
 
 		//done, unbind stuff
 		prog->unbind();
@@ -704,35 +730,34 @@ public:
 		// Bind to shader
 		prog_blur->bind();
 
+		// calculate weights
+		//weights = new float[size];
+		//Gaussian *gauss = new Gaussian();
+		//float * weights_t = gauss->CalculateNormalized1DSampleKernel(1.0, size);
+		//weights = new float[size];
+		//for (int i = 0; i < size; i++) {
+		//	weights[i] = weights_t[i];
+		//	cout << weights[i] << " ";
+		//} cout << endl;
 
-		GLuint block_index = 0;
-		//block_index = glGetProgramResourceIndex(prog_blur->pid, GL_SHADER_STORAGE_BLOCK, "weights_ssbo");
-		//cout << block_index << " - blockindex" << endl;
-		//GLuint ssbo_binding_point_index = 0;
-		//glShaderStorageBlockBinding(prog_blur->pid, block_index, ssbo_binding_point_index);
-		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, weights_ssbo);
-		//glUseProgram(prog_blur->pid);
-
-		// none of these are working
+		// send weights to gpu
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, weights_ssbo);
-		GLvoid* p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-		memcpy(p, &weights, sizeof(float) * size);
+		GLvoid* p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+		memcpy(p, weights, sizeof(float) * size);
 		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-
-		//glUseProgram(prog_blur->pid);
-		//GLuint ssbo_binding_point_index = 0;
-		//glShaderStorageBlockBinding(prog_blur->pid, block_index, ssbo_binding_point_index);
-		//block_index = 0;	//?
-		//block_index = glGetProgramResourceIndex(prog_blur->pid, GL_SHADER_STORAGE_BLOCK, "weights_data");	// The name corresponds to that in the shader
-		//ssbo_binding_point_index = 0;	// ?
-		//glShaderStorageBlockBinding(prog_blur->pid, block_index, ssbo_binding_point_index);
-		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, weights_ssbo);
-
-		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
+		
+		GLuint block_index = 0;
+		block_index = glGetProgramResourceIndex(prog_blur->pid, GL_SHADER_STORAGE_BLOCK, "weights_ssbo");
+		GLuint ssbo_binding_point_index = 0;
+		glShaderStorageBlockBinding(prog_blur->pid, block_index, ssbo_binding_point_index);			// THIS IS THE LINE AT WHICH IT CRASHES. 12:20PM
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, weights_ssbo);
 
 		glUniformMatrix4fv(prog_blur->getUniform("P"), 1, GL_FALSE, glm::value_ptr(P->topMatrix()));
 		glUniformMatrix4fv(prog_blur->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(prog_blur->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		glUniform1i(prog_blur->getUniform("glowMaskOnly"), glowMaskOnly);
+		glUniform1i(prog_blur->getUniform("activateBlur"), activateBlur);
+		glUniform1i(prog_blur->getUniform("size"), size);
 		glBindVertexArray(VertexArrayIDBox);
 
 
@@ -750,8 +775,7 @@ public:
 			glBindTexture(
 				GL_TEXTURE_2D, firstIteration ? TexAlpha : BlurredTexAlpha[!horizontal]
 			);
-			
-
+		
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 
 			horizontal = !horizontal;
@@ -798,10 +822,13 @@ public:
 		glUniformMatrix4fv(prog_final->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(prog_final->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 		glUniform1i(prog_final->getUniform("activateBlur"), activateBlur);
+		glUniform1i(prog_final->getUniform("glowMaskOnly"), glowMaskOnly);
 		glBindVertexArray(VertexArrayIDBox);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		prog_final->unbind();
+
+		cout << "glowMaskOnly: " << glowMaskOnly << " | activateBlur: " << activateBlur << " | kernalSize: " << size << " | glowScale: " << glowScale << endl;
 
 	}
 
