@@ -4,7 +4,7 @@ Skills: C++, OpenGL
 
 Topic: Computer graphics, Advanced rendering techniques, Real-time glow or "bloom"
 
-![Video of glow](https://github.com/chmosquera/Real-Time-Glow-Effect/assets/25163297/00457b38-4c76-4a89-921e-3567108e7caf)
+[Video of glow](https://github.com/chmosquera/Real-Time-Glow-Effect/assets/25163297/00457b38-4c76-4a89-921e-3567108e7caf)
 
 Video: Rotating Earth and moon, demonstrating the glow effect in different stages of the pipeline and with various glow intensity. 
 
