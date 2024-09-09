@@ -26,7 +26,7 @@ Video: Rotating Earth and moon, demonstrating the glow effect in different stage
 
 ## Resources
 - [LearnOpenGL: Bloom](https://learnopengl.com/Advanced-Lighting/Bloom)
-- [GPU Gems: Real-Time Glow](GPU Gems: Real-Time Glow)
+- [GPU Gems: Real-Time Glow](https://developer.nvidia.com/gpugems/gpugems/part-iv-image-processing/chapter-21-real-time-glow)
 - [Unreal Engine: Bloom Post Process Effect](https://docs.unrealengine.com/en-US/Engine/Rendering/PostProcessEffects/Bloom/index.html)
 
 ## Acknowledgments
